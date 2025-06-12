@@ -10,22 +10,66 @@ from urllib.parse import urljoin
 
 def download_extracttext(pdf_url):
     
-    pdf_path = "downloaded_invoice.pdf"
-    response = requests.get(pdf_url)
-    with open(pdf_path, 'wb') as f:
-        f.write(response.content)
-
+    pdf_path = "downloaded_invoice.pdf"    
     # Step 2: Extract text using pdfplumber
     with pdfplumber.open(pdf_path) as pdf:
         text = pdf.pages[0].extract_text()
-        print("Extracted PDF Text:\n", text)
+        #print("Extracted PDF Text:\n", text)
+        #print("Full Text:\n", text)
+        page0 = pdf.pages[0]
+        # Extract tables
+        tables = page0.extract_tables()
+        invoice_data = {}
+        line_items = []
+        totals = {}
+        for table in tables:
+            for i, row in enumerate(table):
+                print(row)
+                if row == ['Invoice No', 'Customer No', 'Invoice Period', 'Date']:
+                    data_row = table[i + 1]
+                    invoice_data['invoice_no'] = data_row[0]
+                    invoice_data['customer_no'] = data_row[1]
+                    invoice_data['invoice_period'] = data_row[2]
+                    invoice_data['date'] = data_row[3]
+                elif row == ['Service Description', 'Amount\n-without VAT-', 'quantity', 'Total Amount']:
+                    j = i + 1
+                    while j < len(table) and table[j][0] and 'Total' not in table[j][1]:
+                        line_items.append({
+                            'description': table[j][0],
+                            'unit_price': table[j][1],
+                            'quantity': table[j][2],
+                            'total': table[j][3]
+                        })
+                        j += 1
+                if row[1] == 'Total':
+                    totals['net_total'] = row[3]
+                if row[1] and 'VAT' in row[1]:
+                    totals['vat'] = row[3]
+                if row[1] and 'Gross' in row[1]:
+                    totals['gross_total'] = row[3]
+
+        invoice_data['line_items'] = line_items
+        invoice_data['totals'] = totals
+        print(invoice_data)
+
+        # Basic regex from text
+        import re
+        invoice_no = re.search(r"Invoice\s*Number\s*[:\-]?\s*(\S+)", text, re.IGNORECASE)
+        customer_no = re.search(r"Customer\s*Number\s*[:\-]?\s*(\S+)", text, re.IGNORECASE)
+        total_amount = re.search(r"Total\s*Amount\s*[:\-]?\s*\$?([\d,.]+)", text, re.IGNORECASE)
+        invoice_period = re.search(r"Period\s*[:\-]?\s*([\w\s\-]+)", text, re.IGNORECASE)
+
+        #print("Invoice No:", invoice_no.group(1) if invoice_no else "Not found")
+        #print("Customer No:", customer_no.group(1) if customer_no else "Not found")
+        #print("Total Amount:", total_amount.group(1) if total_amount else "Not found")
+        #print("Period:", invoice_period.group(1) if invoice_period else "Not found")
     
 
 # Use local ChromeDriver (must be in PATH or specify full path)
 driver = webdriver.Chrome()
 
 driver.get("https://digitalgrub.ws/selenium_ocr_test.html")
-driver.maximize_window()
+#driver.maximize_window()
 driver.implicitly_wait(10)
 page_url = driver.current_url
 
