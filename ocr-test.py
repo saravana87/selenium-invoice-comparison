@@ -9,13 +9,27 @@ import pdfplumber
 from urllib.parse import urljoin
 
 def download_extracttext(pdf_url):
-    
-    pdf_path = "downloaded_invoice.pdf"    
+    """
+    Downloads a PDF from the given URL, saves it locally, and extracts invoice data and text using pdfplumber.
+    Args:
+        pdf_url (str): The URL of the PDF to download and process.
+    Returns:
+        None. Prints extracted invoice data and regex results.
+    """
+    pdf_path = "downloaded_invoice.pdf"
+    # Download the PDF from the URL
+    try:
+        response = requests.get(pdf_url)
+        response.raise_for_status()
+        with open(pdf_path, "wb") as f:
+            f.write(response.content)
+    except Exception as e:
+        print(f"Failed to download PDF: {e}")
+        return
+
     # Step 2: Extract text using pdfplumber
     with pdfplumber.open(pdf_path) as pdf:
         text = pdf.pages[0].extract_text()
-        #print("Extracted PDF Text:\n", text)
-        #print("Full Text:\n", text)
         page0 = pdf.pages[0]
         # Extract tables
         tables = page0.extract_tables()
@@ -53,7 +67,6 @@ def download_extracttext(pdf_url):
         print(invoice_data)
 
         # Basic regex from text
-        import re
         invoice_no = re.search(r"Invoice\s*Number\s*[:\-]?\s*(\S+)", text, re.IGNORECASE)
         customer_no = re.search(r"Customer\s*Number\s*[:\-]?\s*(\S+)", text, re.IGNORECASE)
         total_amount = re.search(r"Total\s*Amount\s*[:\-]?\s*\$?([\d,.]+)", text, re.IGNORECASE)
@@ -63,7 +76,6 @@ def download_extracttext(pdf_url):
         #print("Customer No:", customer_no.group(1) if customer_no else "Not found")
         #print("Total Amount:", total_amount.group(1) if total_amount else "Not found")
         #print("Period:", invoice_period.group(1) if invoice_period else "Not found")
-    
 
 # Use local ChromeDriver (must be in PATH or specify full path)
 driver = webdriver.Chrome()
